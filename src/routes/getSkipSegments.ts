@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { partition } from "lodash";
 import { config } from "../config";
 import { db, privateDB } from "../databases/databases";
-import { skipSegmentsHashKey, skipSegmentsKey, skipSegmentGroupsKey, shadowHiddenIPKey } from "../utils/redisKeys";
+import { skipSegmentGroupsKey, shadowHiddenIPKey } from "../utils/redisKeys";
 import { SBRecord } from "../types/lib.model";
 import {
     ActionType,
@@ -32,6 +32,7 @@ import { parseSkipSegments } from "../utils/parseSkipSegments";
 import { getEtag } from "../middleware/etag";
 import { shuffleArray } from "../utils/array";
 import { Postgres } from "../databases/Postgres";
+import { getSegmentsFromDBByVideoID, getSegmentsFromDBByHash } from "../dao/skipSegment";
 
 async function prepareCategorySegments(
     req: Request,
@@ -272,36 +273,6 @@ async function getSegmentsByHash(
         Logger.error(`get segments by hash error: ${err}`);
         return null;
     }
-}
-
-async function getSegmentsFromDBByHash(hashedVideoIDPrefix: VideoIDHash, service: Service): Promise<DBSegment[]> {
-    const fetchFromDB = () =>
-        db.prepare(
-            "all",
-            `SELECT "videoID", "startTime", "endTime", "votes", "locked", "UUID", "userID", "category", "actionType", "videoDuration", "hidden", "reputation", "shadowHidden", "hashedVideoID", "timeSubmitted", "description" FROM "sponsorTimes"
-            WHERE "hashedVideoID" LIKE ? AND "service" = ? ORDER BY "startTime"`,
-            [`${hashedVideoIDPrefix}%`, service],
-            { useReplica: true }
-        ) as Promise<DBSegment[]>;
-
-    if (hashedVideoIDPrefix.length === 4) {
-        return await QueryCacher.get(fetchFromDB, skipSegmentsHashKey(hashedVideoIDPrefix, service));
-    }
-
-    return await fetchFromDB();
-}
-
-async function getSegmentsFromDBByVideoID(videoID: VideoID, service: Service): Promise<DBSegment[]> {
-    const fetchFromDB = () =>
-        db.prepare(
-            "all",
-            `SELECT "startTime", "endTime", "votes", "locked", "UUID", "userID", "category", "actionType", "videoDuration", "hidden", "reputation", "shadowHidden", "timeSubmitted", "description" FROM "sponsorTimes"
-            WHERE "videoID" = ? AND "service" = ? ORDER BY "startTime"`,
-            [videoID, service],
-            { useReplica: true }
-        ) as Promise<DBSegment[]>;
-
-    return await QueryCacher.get(fetchFromDB, skipSegmentsKey(videoID, service));
 }
 
 // Gets the best choice from the choices array based on their `votes` property.

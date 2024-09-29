@@ -56,20 +56,21 @@ async function getSegmentsFromSB(portVideo: PortVideoDB, paramBiliDuration: Vide
     }
 
     // get all port segments
-    const allSegments = await getSegmentsFromDBByVideoID(bvID, Service.YouTube);
-    const portedSegments = allSegments.filter((s) => s.portUUID === portVideo.UUID);
+    const allDBSegments = await getSegmentsFromDBByVideoID(bvID, Service.YouTube);
+    const portedSegments = allDBSegments.filter((s) => s.portUUID === portVideo.UUID);
     const portedSegmentMap = new Map(portedSegments.map((s) => [s.UUID, s]));
     const ytbSegmentsMap = new Map(ytbSegments.map((s) => [s.UUID, s]));
 
     // request removed segments again to ensure that they are removed
     const removedSegments = portedSegments.filter((s) => !ytbSegmentsMap.has(s.ytbSegmentUUID));
     const removedUUID = removedSegments.map((s) => s.ytbSegmentUUID);
-    const reaquiredSegments = await getYoutubeSegments(ytbID, removedUUID);
-    reaquiredSegments.forEach((s) => ytbSegmentsMap.set(s.UUID, s));
+    const reAquiredSegments = await getYoutubeSegments(ytbID, removedUUID);
+    reAquiredSegments.forEach((s) => ytbSegmentsMap.set(s.UUID, s));
+    const allYtbSegments = [...ytbSegmentsMap.values()];
 
     // new and update and to be removed segments
-    const truelyRemovedSegments = removedSegments.filter((s) => !ytbSegmentsMap.has(s.ytbSegmentUUID));
-    const newSegments = ytbSegments.filter((s) => !portedSegmentMap.has(s.UUID));
+    const truelyRemovedSegments = portedSegments.filter((s) => !ytbSegmentsMap.has(s.ytbSegmentUUID));
+    const newSegments = allYtbSegments.filter((s) => !portedSegmentMap.has(s.UUID));
     const updatingSegments = portedSegments.filter((s) => ytbSegmentsMap.has(s.ytbSegmentUUID));
 
     // update votes for existing segments
